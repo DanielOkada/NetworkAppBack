@@ -1,1 +1,5 @@
 /uploads/
+/test.py
+*.csv
+*.xlsx
+__pycache__/
