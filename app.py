@@ -41,6 +41,28 @@ def get_network():
     return json
 
 
+@app.route('/get_networks')
+def get_networks():
+    input_book = pd.ExcelFile(session["file_path"] + session["filename"])
+
+    networks = {}
+    for sheet in input_book.sheet_names:
+        networks[sheet] = network.get_network_cyto(input_book, sheet)
+
+    return networks
+
+
+@app.route('/get_networks_d3')
+def get_networks_d3():
+    input_book = pd.ExcelFile(session["file_path"] + session["filename"])
+
+    networks = {}
+    for sheet in input_book.sheet_names:
+        networks[sheet] = network.get_network_d3(input_book, sheet)
+
+    return networks
+
+
 @app.route('/get_file_name')
 def get_file_name():
     return session["filename"]
@@ -60,9 +82,17 @@ def set_sheet():
     return {"status": "success"}
 
 
+@app.route('/get_saidai_renketsu', methods=["POST"])
+def get_saidai_renketsu():
+    data = request.form["data"]
+    return network.get_saidai_renketsu(data)
+
+
 @app.route('/test')
 def test():
-    return {"test": "tesuto desu"}
+    df = pd.read_csv("category-brands.csv")
+    j = df.to_json()
+    return j
 
 
 if __name__ == '__main__':

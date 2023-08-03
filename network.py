@@ -1,6 +1,11 @@
+import time
+
 import numpy as np
 import pandas as pd
 import networkx as nx
+import json
+
+
 # from networkx.algorithms import bipartite
 # import scipy.stats
 
@@ -65,10 +70,9 @@ def conv_RGB_to_colorcode(rgb):
 
 
 def get_network_image(input_book, sheet):
+    group1, group2 = "會社名", "役員名"
     input_sheet_df = input_book.parse(sheet, usecols=["會社名", "役員名"])
     df = input_sheet_df.dropna(how='any')
-
-    G = nx.Graph()
 
     # 支店などを消す
     df = df[~df['會社名'].str.contains('支店')]
@@ -78,10 +82,11 @@ def get_network_image(input_book, sheet):
     # 米穀取引所を消す
     df = df[~df['會社名'].str.contains('米穀')]
 
+    G = nx.Graph()
     make_network(df[["會社名", "役員名"]], G)
-    # print(df)
 
     d = nx.json_graph.node_link_data(G)
+
     # キー名を変更
     new_key = 'edges'
     d[new_key] = d.pop('links')
@@ -91,7 +96,88 @@ def get_network_image(input_book, sheet):
         new_edges.append({"from": edge["source"], "to": edge["target"]})
     d["edges"] = new_edges
 
-    for node in d["nodes"]:
-        node["label"] = node["id"]
+    def get_node_df(group):
+        new_df = pd.DataFrame(columns=["group", "id", "label"])
+        new_df["id"] = df[group].drop_duplicates()
+        new_df["label"] = new_df["id"]
+        new_df["group"] = group
+
+        return new_df
+
+    node_df = pd.concat([get_node_df(group=group1), get_node_df(group=group2)])
+    d["nodes"] = node_df.to_dict(orient='records')
 
     return d
+
+
+def get_network_cyto(input_book, sheet):
+    group1, group2 = "會社名", "役員名"
+    df = input_book.parse(sheet, usecols=["會社名", "役員名"])
+
+    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.applymap(lambda x: x.replace('　', '') if isinstance(x, str) else x)
+    df = df.replace("", pd.NA).dropna(how='any')
+    # df = df.dropna(how='any')
+
+    # df[group1] = df[group1].apply(lambda x: x.strip())
+    # df[group2] = df[group2].apply(lambda x: x.strip())
+
+    # 支店などを消す
+    df = df[~df['會社名'].str.contains('支店')]
+    df = df[~df['會社名'].str.contains('出張')]
+    # 株式会社でないものを消す
+    df = df[df['會社名'].str.contains('株式')]
+    # 米穀取引所を消す
+    df = df[~df['會社名'].str.contains('米穀')]
+
+    G = nx.Graph()
+    make_network(df[["會社名", "役員名"]], G)
+
+    d = nx.json_graph.cytoscape_data(G)
+
+    def setLabel(node):
+        node["data"]["label"] = node["data"].pop("name")
+        return node
+
+    d["elements"]["nodes"] = list(map(lambda node: setLabel(node), d["elements"]["nodes"]))
+
+    return d
+
+
+def get_network_d3(input_book, sheet):
+    group1, group2 = "會社名", "役員名"
+    df = input_book.parse(sheet, usecols=["會社名", "役員名"])
+
+    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.applymap(lambda x: x.replace('　', '') if isinstance(x, str) else x)
+    df = df.replace("", pd.NA).dropna(how='any')
+    # df = df.dropna(how='any')
+
+    # df[group1] = df[group1].apply(lambda x: x.strip())
+    # df[group2] = df[group2].apply(lambda x: x.strip())
+
+    # 支店などを消す
+    df = df[~df['會社名'].str.contains('支店')]
+    df = df[~df['會社名'].str.contains('出張')]
+    # # 株式会社でないものを消す
+    # df = df[df['會社名'].str.contains('株式')]
+    # 米穀取引所を消す
+    df = df[~df['會社名'].str.contains('米穀')]
+
+    G = nx.Graph()
+    make_network(df[["會社名", "役員名"]], G)
+
+    d = nx.json_graph.node_link_data(G)
+
+    largest = max(nx.connected_components(G), key=len)
+    d["saidai"] = list(largest)
+
+    return d
+
+
+def get_saidai_renketsu(data):
+    G = nx.node_link_graph(json.loads(data))
+    largest = max(nx.connected_components(G), key=len)
+    saidai_G = G.subgraph(largest)
+
+    return nx.json_graph.node_link_data(saidai_G)
